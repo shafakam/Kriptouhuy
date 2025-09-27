@@ -79,9 +79,8 @@ int main() {
     cout << endl;
 
     // --- DEKRIPSI ---
-    for (int i = 0; i < BLOCK_SIZE; i++) {
-        prev[i] = iv[i]; // reset IV
-    }
+    // mindahin prev ke IV
+    memcpy(prev, iv, BLOCK_SIZE);
 
     for (int b = 0; b < numBlocks; b++) {
         char block[BLOCK_SIZE];
