@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring> 
 using namespace std;
 
 const int BLOCK_SIZE = 16; // 16 byte
@@ -23,11 +24,8 @@ int main() {
     char ciphertext[1024];
     char decrypted[1024];
 
-    // hitung panjang plaintext manual
-    int len = 0;
-    while (plaintext[len] != '\0') {
-        len++;
-    }
+    // hitung panjang plaintext pake fungsi bawaan dari <cstring>
+    int len = strlen(plaintext);
 
     // jumlah blok (dibulatkan ke atas)
     int numBlocks = (len + BLOCK_SIZE - 1) / BLOCK_SIZE;
