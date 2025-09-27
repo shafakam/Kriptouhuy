@@ -2,107 +2,69 @@
 #include <string>
 using namespace std;
 
-const int BLOCK_SIZE = 16; // 16 byte
-
-// fungsi enkripsi
-string encryptCBC(const string &plaintext, const string &key, const string &iv, int &numBlocks) {
-    int len = plaintext.size();
-    numBlocks = (len + BLOCK_SIZE - 1) / BLOCK_SIZE;
-
-    string ciphertext(numBlocks * BLOCK_SIZE, '\0');
-    string prev = iv;
-
-    for (int b = 0; b < numBlocks; b++) {
-        string block(BLOCK_SIZE, '\0');
-        // ambil plaintext ke blok
-        for (int i = 0; i < BLOCK_SIZE; i++) {
-            int idx = b * BLOCK_SIZE + i;
-            if (idx < len) block[i] = plaintext[idx];
-        }
-        // XOR dengan prev
-        for (int i = 0; i < BLOCK_SIZE; i++) {
-            block[i] ^= prev[i];
-        }
-        // XOR dengan key
-        for (int i = 0; i < BLOCK_SIZE; i++) {
-            block[i] ^= key[i];
-        }
-        // simpan ke ciphertext
-        for (int i = 0; i < BLOCK_SIZE; i++) {
-            ciphertext[b * BLOCK_SIZE + i] = block[i];
-        }
-        // update prev
-        prev = block;
-    }
-    return ciphertext;
+// Rotate left 32-bit sederhana
+unsigned int rotl(unsigned int x, int n) {
+    return (x << n) | (x >> (32 - n));
 }
 
-// fungsi dekripsi
-string decryptCBC(const string &ciphertext, const string &key, const string &iv, int numBlocks, int plainLen) {
-    string decrypted(numBlocks * BLOCK_SIZE, '\0');
-    string prev = iv;
-
-    for (int b = 0; b < numBlocks; b++) {
-        string block(BLOCK_SIZE, '\0');
-        // ambil ciphertext ke blok
-        for (int i = 0; i < BLOCK_SIZE; i++) {
-            block[i] = ciphertext[b * BLOCK_SIZE + i];
-        }
-        // XOR dengan key
-        for (int i = 0; i < BLOCK_SIZE; i++) {
-            block[i] ^= key[i];
-        }
-        // XOR dengan prev
-        for (int i = 0; i < BLOCK_SIZE; i++) {
-            block[i] ^= prev[i];
-        }
-        // simpan hasil
-        for (int i = 0; i < BLOCK_SIZE; i++) {
-            decrypted[b * BLOCK_SIZE + i] = block[i];
-        }
-        // update prev
-        prev = ciphertext.substr(b * BLOCK_SIZE, BLOCK_SIZE);
-    }
-    decrypted.resize(plainLen); // buang padding
-    return decrypted;
+// Quarter round sederhana (mirip Salsa20)
+void quarterRound(unsigned int &a, unsigned int &b, unsigned int &c, unsigned int &d) {
+    b ^= rotl(a + d, 7);
+    c ^= rotl(b + a, 9);
+    d ^= rotl(c + b, 13);
+    a ^= rotl(d + c, 18);
 }
 
-// fungsi print ciphertext
-void printCiphertext(const string &ciphertext, int numBlocks) {
-    cout << "Ciphertext (hex): ";
-    for (int i = 0; i < numBlocks * BLOCK_SIZE; i++) {
-        unsigned char c = ciphertext[i];
-        cout << hex << (int)c << " ";
+// Generate keystream sederhana
+void generateKeyStream(unsigned int key[4], unsigned int nonce[2], unsigned int keystream[16]) {
+    for(int i = 0; i < 4; i++) keystream[i] = key[i];
+    for(int i = 0; i < 2; i++) keystream[4+i] = nonce[i];
+    for(int i = 6; i < 16; i++) keystream[i] = 0xdeadbeef; // filler
+
+    // 2 round sederhana
+    for(int round=0; round<2; round++){
+        quarterRound(keystream[0], keystream[4], keystream[8], keystream[12]);
+        quarterRound(keystream[1], keystream[5], keystream[9], keystream[13]);
+        quarterRound(keystream[2], keystream[6], keystream[10], keystream[14]);
+        quarterRound(keystream[3], keystream[7], keystream[11], keystream[15]);
     }
-    cout << endl;
+}
+
+// Enkripsi/dekripsi (XOR dengan keystream)
+string salsaEncrypt(const string &text, unsigned int key[4], unsigned int nonce[2]) {
+    unsigned int keystream[16];
+    generateKeyStream(key, nonce, keystream);
+    string output = text;
+    for(size_t i = 0; i < text.size(); i++){
+        output[i] ^= ((char*)keystream)[i % 64]; // 16*4 byte keystream
+    }
+    return output;
 }
 
 int main() {
-    string plaintext, key, iv;
+    string plaintext;
     cout << "Masukkan plaintext: ";
     getline(cin, plaintext);
 
-    cout << "Masukkan key (16 karakter): ";
-    getline(cin, key);
-    while (key.size() != BLOCK_SIZE) {
-        cout << "Error: Key harus tepat 16 karakter!\n";
-        cout << "Masukkan key (16 karakter): ";
-        getline(cin, key);
+    string key_input;
+    cout << "Masukkan key 16 karakter: ";
+    getline(cin, key_input);
+    while(key_input.size() < 16) key_input += '\0';
+
+    unsigned int key[4];
+    for(int i=0;i<4;i++){
+        key[i] = *(unsigned int*)(key_input.data()+i*4);
     }
 
-    cout << "Masukkan IV (16 karakter): ";
-    getline(cin, iv);
-    while (iv.size() != BLOCK_SIZE) {
-        cout << "Error: IV harus tepat 16 karakter!\n";
-        cout << "Masukkan IV (16 karakter): ";
-        getline(cin, iv);
-    }
+    unsigned int nonce[2] = {0x12345678, 0x9abcdef0};
 
-    int numBlocks;
-    string ciphertext = encryptCBC(plaintext, key, iv, numBlocks);
+    string cipher = salsaEncrypt(plaintext, key, nonce);
+    cout << "Ciphertext (hex): ";
+    for(unsigned char c : cipher) printf("%02x", c);
+    cout << endl;
 
-    printCiphertext(ciphertext, numBlocks);
-
-    string decrypted = decryptCBC(ciphertext, key, iv, numBlocks, plaintext.size());
+    string decrypted = salsaEncrypt(cipher, key, nonce);
     cout << "Hasil dekripsi: " << decrypted << endl;
+
+    return 0;
 }
