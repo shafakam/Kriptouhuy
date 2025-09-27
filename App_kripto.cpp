@@ -32,9 +32,7 @@ int main() {
 
     // --- ENKRIPSI ---
     char prev[BLOCK_SIZE]; // buat simpan blok sebelumnya (CBC)
-    for (int i = 0; i < BLOCK_SIZE; i++) {
-        prev[i] = iv[i]; // blok pertama pakai IV
-    }
+    memcpy(prev, iv, BLOCK_SIZE); // inisialisasi prev dengan IV
 
     for (int b = 0; b < numBlocks; b++) {
         char block[BLOCK_SIZE];
