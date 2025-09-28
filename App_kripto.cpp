@@ -138,7 +138,7 @@ int main() {
         cin >> subpilihan;
         cin.ignore();
 
-        cout << "Masukkan plaintext: ";
+        cout << "Masukkan text: ";
         getline(cin, text);
 
         string key_input;
@@ -155,7 +155,7 @@ int main() {
 
         if (subpilihan == 1) {
             string cipher = salsaEncrypt(text, key, nonce);
-            cout << "Ciphertext (hex): " << bytesToHex(cipher) << endl;
+            cout << "Ciphertext (hex): " << bytesToHex(cipher) << endl << endl;
             main();
         } else if (subpilihan == 2) {
             string cipher = hexToBytes(text);        
